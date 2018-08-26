@@ -52,11 +52,13 @@ const defaultTypesMap = new Map();
 function defineProps(constructor) {
   if (constructor.hasOwnProperty('_propsNormalized')) return;
   const { props } = constructor;
+  constructor._propsList = [];
   keys(props).forEach(name => {
     let func = props[name] || props.any;
     if (defaultTypesMap.has(func)) func = defaultTypesMap.get(func);
     if (typeof func !== 'function') func = prop((func: any));
     func({ constructor }, name);
+    constructor._propsList.push(name);
   });
 }
 
@@ -114,6 +116,7 @@ export function prop(definition: PropType | void): Function {
           }
         }
         this._props[name] = coerce.call(this, val, name);
+        this._modifiedProps[name] = true;
         this.triggerUpdate();
       }
     });
@@ -138,6 +141,7 @@ export const withUpdate = (Base: Class<any> = HTMLElement): Class<any> =>
     _prevState: Object;
     _props: Object;
     _state: Object;
+    _modifiedProps: Object;
     _syncingAttributeToProperty: null | string;
     _syncingPropertyToAttribute: boolean;
     _updating: boolean;
@@ -157,6 +161,7 @@ export const withUpdate = (Base: Class<any> = HTMLElement): Class<any> =>
     _prevState = {};
     _props = {};
     _state = {};
+    _modifiedProps = {};
 
     static get observedAttributes(): Array<string> {
       // We have to define props here because observedAttributes are retrieved
@@ -223,6 +228,7 @@ export const withUpdate = (Base: Class<any> = HTMLElement): Class<any> =>
             : newValue;
           this._props[propertyName] =
             propertyValue == null ? defaultValue.call(this) : propertyValue;
+          this._modifiedProps[propertyName] = true;
           this.triggerUpdate();
         }
       }
@@ -241,6 +247,9 @@ export const withUpdate = (Base: Class<any> = HTMLElement): Class<any> =>
       if (super.connectedCallback) {
         super.connectedCallback();
       }
+      const propsList = this.constructor._propsList;
+      for (let i = 0, l = propsList.length; i < l; i += 1)
+        this._modifiedProps[propsList[i]] = true;
       this.triggerUpdate();
     }
 
@@ -254,15 +263,21 @@ export const withUpdate = (Base: Class<any> = HTMLElement): Class<any> =>
       }
       this._updating = true;
       delay(() => {
-        const { _prevProps, _prevState } = this;
+        const { _prevProps, _prevState, _modifiedProps } = this;
         if (this.updating) {
-          this.updating(_prevProps, _prevState);
+          this.updating(_prevProps, _prevState, _modifiedProps);
         }
-        if (this.updated && this.shouldUpdate(_prevProps, _prevState)) {
-          this.updated(_prevProps, _prevState);
+        if (
+          this.updated &&
+          this.shouldUpdate(_prevProps, _prevState, _modifiedProps)
+        ) {
+          this.updated(_prevProps, _prevState, _modifiedProps);
         }
         this._prevProps = this.props;
         this._prevState = this.state;
+        const propsList = this.constructor._propsList;
+        for (let i = 0, l = propsList.length; i < l; i += 1)
+          this._modifiedProps[propsList[i]] = false;
         this._updating = false;
       });
     }
