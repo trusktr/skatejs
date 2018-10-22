@@ -20,8 +20,8 @@
   ],
   "main": "dist/node/index.js",
   "module": "dist/es/index.js",
-  "name": "skatejs",
+  "name": "@trusktr/skatejs",
   "repository": "https://github.com/skatejs/skatejs",
   "types": "src/index.d.ts",
-  "version": "5.2.4"
+  "version": "5.2.40001"
 }
